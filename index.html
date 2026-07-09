@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reference Integrity Checker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"
+        onerror="var s=document.createElement('script');s.src='https://unpkg.com/docx@8.5.0/build/index.umd.js';document.head.appendChild(s);"></script>
+<style>
+  :root{
+    --paper:#F6F7F5;
+    --card:#FFFFFF;
+    --ink:#17212C;
+    --ink-soft:#4C5B6B;
+    --line:#D9DEE3;
+    --verify:#1E7A46;
+    --verify-bg:#E8F4EC;
+    --critical:#B3261E;
+    --critical-bg:#FBEBEA;
+    --minor:#9A6700;
+    --minor-bg:#FBF3DF;
+    --neutral:#55657A;
+    --neutral-bg:#EDF0F3;
+    --action:#17212C;
+    --mono:'IBM Plex Mono', ui-monospace, monospace;
+    --body:'Source Sans 3', -apple-system, system-ui, sans-serif;
+    --display:'Fraunces', Georgia, serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--paper); color:var(--ink); font-family:var(--body); font-size:17px; line-height:1.55;}
+  .wrap{max-width:880px; margin:0 auto; padding:48px 20px 80px;}
+
+  header h1{font-family:var(--display); font-weight:650; font-size:clamp(30px,5vw,44px); line-height:1.1; letter-spacing:-0.01em;}
+  header .sub{margin-top:10px; color:var(--ink-soft); max-width:60ch;}
+  .kicker{font-family:var(--mono); font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:14px;}
+  .kicker b{color:var(--verify); font-weight:500;}
+
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:22px; margin-top:28px;}
+  label{display:block; font-weight:600; margin-bottom:8px;}
+  .hint{font-size:14px; color:var(--ink-soft); margin-bottom:10px;}
+  textarea{width:100%; min-height:220px; resize:vertical; border:1px solid var(--line); border-radius:8px; padding:14px; font-family:var(--mono); font-size:13.5px; line-height:1.6; color:var(--ink); background:#FCFDFC;}
+  textarea:focus, input:focus{outline:2px solid var(--ink); outline-offset:1px;}
+  .row{display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin-top:14px;}
+  input[type=email]{border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-family:var(--body); font-size:15px; min-width:260px; flex:1;}
+
+  button{font-family:var(--body); font-weight:700; font-size:16px; border:none; border-radius:8px; padding:12px 22px; cursor:pointer;}
+  .btn-main{background:var(--action); color:#fff;}
+  .btn-main:hover{background:#2A3A4C;}
+  .btn-main:disabled{background:#9AA6B2; cursor:not-allowed;}
+  .btn-ghost{background:transparent; color:var(--ink); border:1.5px solid var(--ink);}
+  .btn-ghost:hover{background:var(--neutral-bg);}
+  button:focus-visible{outline:2px solid var(--verify); outline-offset:2px;}
+
+  #progressWrap{display:none; margin-top:18px;}
+  .progress-track{height:8px; background:var(--neutral-bg); border-radius:99px; overflow:hidden;}
+  .progress-fill{height:100%; width:0%; background:var(--verify); border-radius:99px; transition:width .3s;}
+  #progressLabel{font-family:var(--mono); font-size:13px; color:var(--ink-soft); margin-top:8px;}
+
+  #summary{display:none; margin-top:30px;}
+  .stamps{display:flex; gap:12px; flex-wrap:wrap;}
+  .stamp{border:2px solid; border-radius:6px; padding:10px 16px; font-family:var(--mono); font-size:13px; letter-spacing:0.06em; text-transform:uppercase; transform:rotate(-1deg); background:#fff;}
+  .stamp b{display:block; font-size:24px; letter-spacing:0; font-family:var(--body); line-height:1.1;}
+  .stamp.ok{color:var(--verify); border-color:var(--verify);}
+  .stamp.minor{color:var(--minor); border-color:var(--minor); transform:rotate(1deg);}
+  .stamp.critical{color:var(--critical); border-color:var(--critical); transform:rotate(-1.5deg);}
+  .stamp.notfound{color:var(--neutral); border-color:var(--neutral); transform:rotate(0.8deg);}
+
+  #results{margin-top:22px;}
+  .ref{background:var(--card); border:1px solid var(--line); border-left:5px solid var(--line); border-radius:8px; padding:16px 18px; margin-bottom:14px;}
+  .ref.ok{border-left-color:var(--verify);}
+  .ref.minor{border-left-color:var(--minor);}
+  .ref.critical{border-left-color:var(--critical);}
+  .ref.error{border-left-color:var(--neutral);}
+  .ref-head{display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;}
+  .ref-num{font-family:var(--mono); font-size:13px; color:var(--ink-soft);}
+  .badge{font-family:var(--mono); font-size:11.5px; letter-spacing:0.08em; text-transform:uppercase; padding:3px 10px; border-radius:99px; font-weight:500;}
+  .badge.ok{background:var(--verify-bg); color:var(--verify);}
+  .badge.minor{background:var(--minor-bg); color:var(--minor);}
+  .badge.critical{background:var(--critical-bg); color:var(--critical);}
+  .badge.error{background:var(--neutral-bg); color:var(--neutral);}
+  .ref-text{font-family:var(--mono); font-size:13px; line-height:1.65; margin-top:10px; color:var(--ink); word-break:break-word;}
+  .issues{margin-top:10px; padding-left:0; list-style:none;}
+  .issues li{font-size:15px; padding:5px 0 5px 24px; position:relative;}
+  .issues li::before{content:''; position:absolute; left:4px; top:12px; width:10px; height:10px; border-radius:2px;}
+  .issues li.critical{color:var(--critical);}
+  .issues li.critical::before{background:var(--critical);}
+  .issues li.minor{color:var(--minor);}
+  .issues li.minor::before{background:var(--minor);}
+  .matched{font-size:13.5px; color:var(--ink-soft); margin-top:10px; border-top:1px dashed var(--line); padding-top:8px;}
+  .matched a{color:var(--ink-soft);}
+
+  footer{margin-top:48px; font-size:13.5px; color:var(--ink-soft); border-top:1px solid var(--line); padding-top:16px;}
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Checked against <b>PubMed</b> · <b>Crossref</b> · <b>Google Books</b> · <b>the live web</b></div>
+    <h1>Reference Integrity Checker</h1>
+    <p class="sub">Paste a reference list from a scientific paper. Journal articles are checked against PubMed and Crossref, books against Google Books and Open Library, and web citations against the live page itself. Anything that doesn't match — from a fabricated citation to a wrong page number — is flagged and documented in a downloadable Word report.</p>
+  </header>
+
+  <div class="panel">
+    <label for="refInput">Reference list</label>
+    <p class="hint">Paste the references exactly as they appear in the paper — journal articles, books, and website citations all work. Numbered ("1.", "[1]") or one reference per line both work.</p>
+    <textarea id="refInput" placeholder="1. Smith JA, Jones B. Effects of X on Y. N Engl J Med. 2019;380(2):112-120.&#10;2. ..." spellcheck="false"></textarea>
+    <div class="row">
+      <input type="email" id="emailInput" placeholder="Your email (optional — gives faster, politer API access)">
+      <button class="btn-main" id="checkBtn">Check references</button>
+    </div>
+    <div id="progressWrap">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div id="progressLabel">Preparing…</div>
+    </div>
+  </div>
+
+  <div id="summary">
+    <div class="stamps">
+      <div class="stamp ok"><b id="countOk">0</b>verified</div>
+      <div class="stamp minor"><b id="countMinor">0</b>minor issues</div>
+      <div class="stamp critical"><b id="countCritical">0</b>critical</div>
+      <div class="stamp notfound"><b id="countError">0</b>unverifiable</div>
+    </div>
+    <div class="row" style="margin-top:18px;">
+      <button class="btn-main" id="downloadBtn">Download Word report (.docx)</button>
+      <button class="btn-ghost" id="resetBtn">Start over</button>
+    </div>
+  </div>
+
+  <div id="results" aria-live="polite"></div>
+
+  <footer>
+    <p><strong>How to read the results.</strong> <span style="color:var(--critical);">Critical</span> = the reference may be fabricated or points to the wrong work (not found, wrong title, wrong authors, wrong DOI or ISBN, dead web link, year off by more than one). <span style="color:var(--minor);">Minor</span> = the work exists but a detail differs (journal name/abbreviation, publisher, volume, pages, year off by one, web page content that no longer matches the citation). Journal articles are verified via Crossref and PubMed, books via Google Books and Open Library, and website references by loading the cited page (via a public relay, with the Internet Archive as backup). Automated matching isn't perfect — always double-check flagged items by opening the linked record.</p>
+  </footer>
+</div>
+<script>
+/* ============================================================
+   Reference Integrity Checker — runs entirely in the browser.
+   APIs used (both free, no key, CORS-enabled):
+   - Crossref REST API   https://api.crossref.org
+   - PubMed E-utilities  https://eutils.ncbi.nlm.nih.gov
+   ============================================================ */
+
+const STOPWORDS = new Set(['the','and','of','a','an','in','on','for','with','from','to','by','at','is','are','as','into','via','among','between','during','after','before','its','their','over','under','about','versus','vs']);
+
+const state = { results: [], running: false };
+
+function $(id){ return document.getElementById(id); }
+
+function normalize(s){
+  return (s||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9 ]+/g,' ')
+    .replace(/\s+/g,' ').trim();
+}
+
+function significantTokens(s){
+  let toks = normalize(s).split(' ').filter(w => w.length >= 4 && !STOPWORDS.has(w));
+  if (toks.length < 3) toks = normalize(s).split(' ').filter(w => w.length >= 3 && !STOPWORDS.has(w));
+  return toks;
+}
+
+/* How much of `title` is present in `text` (0..1) */
+function containment(title, text){
+  const toks = significantTokens(title);
+  if (!toks.length) return 0;
+  const hay = ' ' + normalize(text) + ' ';
+  let hit = 0;
+  for (const t of toks){ if (hay.includes(t)) hit++; }
+  return hit / toks.length;
+}
+
+/* ---------- 1. Split the pasted block into references ---------- */
+function splitReferences(text){
+  const rawLines = text.split(/\r?\n/);
+  const numRe = /^\s*(?:\[(\d{1,3})\]|(\d{1,3})[.)])\s+/;
+  const numberedIdx = rawLines.filter(l => numRe.test(l)).length;
+
+  let refs = [];
+  if (numberedIdx >= 2){
+    let cur = null;
+    for (const line of rawLines){
+      if (numRe.test(line)){
+        if (cur) refs.push(cur);
+        cur = line.trim();
+      } else if (cur && line.trim()){
+        cur += ' ' + line.trim();
+      }
+    }
+    if (cur) refs.push(cur);
+  } else if (/\n\s*\n/.test(text)){
+    refs = text.split(/\n\s*\n+/).map(b => b.replace(/\s+/g,' ').trim()).filter(Boolean);
+  } else {
+    refs = rawLines.map(l => l.trim()).filter(l => l.length > 20);
+  }
+  return refs.map(r => ({
+    original: r,
+    body: r.replace(numRe,'').trim()
+  })).filter(r => r.body.length > 10);
+}
+
+/* ---------- 2. Extract clues from a reference string ---------- */
+function extractClues(body){
+  const doiMatch = body.match(/\b10\.\d{4,9}\/[^\s"'<>]+/);
+  let doi = doiMatch ? doiMatch[0].replace(/[).,;\]]+$/,'') : null;
+  const yearMatches = body.match(/\b(19|20)\d{2}\b/g);
+  const year = yearMatches ? parseInt(yearMatches[yearMatches.length-1],10) : null;
+  const firstAuthor = (body.match(/^([A-Z][A-Za-z'’-]{1,25})/) || [])[1] || null;
+  const hasEtAl = /et al/i.test(body);
+  const isbnMatch = body.match(/ISBN[-:\s]*([\dXx][\dXx\s-]{8,20}[\dXx])/i) || body.match(/\b(97[89][-\s]?(?:\d[-\s]?){9}\d)\b/);
+  const isbn = isbnMatch ? isbnMatch[1].replace(/[-\s]/g,'') : null;
+  return { doi, year, firstAuthor, hasEtAl, isbn };
+}
+
+/* A website citation: has a URL that is not a doi.org / pubmed link */
+function extractUrl(body){
+  const m = body.match(/https?:\/\/[^\s<>"')\]]+/i) || body.match(/\bwww\.[^\s<>"')\]]+/i);
+  if (!m) return null;
+  let u = m[0].replace(/[.,;)\]]+$/,'');
+  if (/^www\./i.test(u)) u = 'https://' + u;
+  if (/(^https?:\/\/)?(dx\.)?doi\.org\//i.test(u) || /pubmed\.ncbi/i.test(u)) return null;
+  return u;
+}
+
+/* Heuristics for spotting a book or book chapter */
+function looksLikeBook(body, clues){
+  // Strong, unambiguous book signals — checked first, before any journal-pattern bailout.
+  if (clues.isbn) return true;
+  if (/\bIn:\s*[A-Z]/.test(body)) return true;                              // book chapter
+  if (/\b\d+(st|nd|rd|th)\s+ed(ition|\.)/i.test(body)) return true;         // "3rd ed."
+  if (/\b(University Press|Academic Press|Press|Publish(ing|ers)|Springer|Elsevier|Wiley|Routledge|McGraw|Blackwell|Penguin|HarperCollins|Random House|Murray|Norton|Vintage|Knopf|Bloomsbury|Macmillan|Oxford|Cambridge)\b/.test(body)) return true;
+
+  // Weaker signals — only if it doesn't already look like a journal article.
+  const hasJournalPattern = /\d+\s*\(\d+\)\s*:\s*[A-Za-z]?\d+/.test(body) || /;\s*\d+\s*:\s*[A-Za-z]?\d+/.test(body);
+  if (hasJournalPattern) return false;
+  if (/\b(ed(s)?\.|editors?)\b/i.test(body) && /\b\d+\s*[-–]\s*\d+\s*\.?\s*$/.test(body)) return true; // chapter with page range at end
+  if (/:\s*[A-Z][A-Za-z&.\s'-]{2,45};\s*(19|20)\d{2}/.test(body)) return true; // "City: Publisher; Year"
+  return false;
+}
+
+/* ---------- 3. API lookups ---------- */
+function mailtoParam(){
+  const e = $('emailInput').value.trim();
+  return e ? '&mailto=' + encodeURIComponent(e) : '';
+}
+
+async function fetchJSON(url){
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  return resp.json();
+}
+
+function crossrefToRecord(item){
+  if (!item) return null;
+  return {
+    source: 'Crossref',
+    title: (item.title && item.title[0]) || '',
+    authors: (item.author || []).map(a => a.family || a.name || '').filter(Boolean),
+    year: (item.issued && item.issued['date-parts'] && item.issued['date-parts'][0] && item.issued['date-parts'][0][0]) || null,
+    journals: [ ...(item['container-title']||[]), ...(item['short-container-title']||[]) ].filter(Boolean),
+    volume: item.volume || null,
+    pages: item.page || null,
+    doi: item.DOI ? item.DOI.toLowerCase() : null,
+    url: item.DOI ? 'https://doi.org/' + item.DOI : (item.URL || null)
+  };
+}
+
+async function lookupCrossrefByDOI(doi){
+  try {
+    const data = await fetchJSON('https://api.crossref.org/works/' + encodeURIComponent(doi));
+    return crossrefToRecord(data.message);
+  } catch(e){ return null; }
+}
+
+async function lookupCrossrefBiblio(body){
+  try {
+    const q = encodeURIComponent(body.slice(0, 350));
+    const data = await fetchJSON('https://api.crossref.org/works?query.bibliographic=' + q + '&rows=4' + mailtoParam());
+    const items = (data.message && data.message.items) || [];
+    let best = null, bestScore = 0;
+    for (const it of items){
+      const rec = crossrefToRecord(it);
+      if (!rec || !rec.title) continue;
+      const score = containment(rec.title, body);
+      if (score > bestScore){ best = rec; bestScore = score; }
+    }
+    return { record: best, score: bestScore };
+  } catch(e){ return { record: null, score: 0, error: true }; }
+}
+
+async function lookupPubMed(body, clues){
+  try {
+    const toks = significantTokens(body).slice(0, 12).join(' ');
+    let term = toks;
+    if (clues.year) term += ' AND ' + clues.year + '[pdat]';
+    const es = await fetchJSON('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax=3&term=' + encodeURIComponent(term));
+    const ids = (es.esearchresult && es.esearchresult.idlist) || [];
+    if (!ids.length) return { record: null, score: 0 };
+    const sum = await fetchJSON('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id=' + ids.join(','));
+    let best = null, bestScore = 0;
+    for (const id of ids){
+      const d = sum.result && sum.result[id];
+      if (!d) continue;
+      const doiId = (d.articleids || []).find(a => a.idtype === 'doi');
+      const rec = {
+        source: 'PubMed',
+        title: d.title || '',
+        authors: (d.authors || []).map(a => (a.name || '').split(' ')[0]).filter(Boolean),
+        year: parseInt((d.pubdate || '').slice(0,4),10) || null,
+        journals: [d.fulljournalname, d.source].filter(Boolean),
+        volume: d.volume || null,
+        pages: d.pages || null,
+        doi: doiId ? doiId.value.toLowerCase() : null,
+        url: 'https://pubmed.ncbi.nlm.nih.gov/' + id + '/'
+      };
+      const score = containment(rec.title, body);
+      if (score > bestScore){ best = rec; bestScore = score; }
+    }
+    return { record: best, score: bestScore };
+  } catch(e){ return { record: null, score: 0, error: true }; }
+}
+
+/* ---------- 3b. Book lookups: Google Books + Open Library (both free, no key) ---------- */
+async function lookupGoogleBooks(body, clues){
+  const toRecord = it => {
+    const vi = it.volumeInfo || {};
+    const isbns = (vi.industryIdentifiers || []).map(x => (x.identifier||'').replace(/[-\s]/g,''));
+    return {
+      source: 'Google Books',
+      title: vi.title ? vi.title + (vi.subtitle ? ': ' + vi.subtitle : '') : '',
+      authors: (vi.authors || []).map(a => a.trim().split(/\s+/).pop()).filter(Boolean),
+      year: parseInt((vi.publishedDate || '').slice(0,4),10) || null,
+      journals: [vi.publisher].filter(Boolean),
+      volume: null, pages: null, doi: null, isbns,
+      url: vi.infoLink || vi.canonicalVolumeLink || null
+    };
+  };
+  try {
+    // ISBN is the strongest evidence — try it first
+    if (clues.isbn){
+      const data = await fetchJSON('https://www.googleapis.com/books/v1/volumes?q=isbn:' + clues.isbn);
+      if (data.totalItems > 0 && data.items){
+        const rec = toRecord(data.items[0]);
+        return { record: rec, score: Math.max(containment(rec.title, body), 0.75), isbnVerified: true };
+      }
+    }
+    const q = encodeURIComponent(significantTokens(body).slice(0, 10).join(' '));
+    const data = await fetchJSON('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=5');
+    let best = null, bestScore = 0;
+    for (const it of (data.items || [])){
+      const rec = toRecord(it);
+      if (!rec.title) continue;
+      const score = containment(rec.title, body);
+      if (score > bestScore){ best = rec; bestScore = score; }
+    }
+    return { record: best, score: bestScore, isbnVerified: false, isbnMissing: !!clues.isbn };
+  } catch(e){ return { record: null, score: 0, error: true }; }
+}
+
+async function lookupOpenLibrary(body){
+  try {
+    const q = encodeURIComponent(significantTokens(body).slice(0, 10).join(' '));
+    const data = await fetchJSON('https://openlibrary.org/search.json?q=' + q + '&limit=5&fields=title,author_name,first_publish_year,publisher,key');
+    let best = null, bestScore = 0;
+    for (const d of (data.docs || [])){
+      const rec = {
+        source: 'Open Library',
+        title: d.title || '',
+        authors: (d.author_name || []).map(a => a.trim().split(/\s+/).pop()).filter(Boolean),
+        year: d.first_publish_year || null,
+        journals: (d.publisher || []).slice(0,3),
+        volume: null, pages: null, doi: null,
+        url: d.key ? 'https://openlibrary.org' + d.key : null
+      };
+      const score = containment(rec.title, body);
+      if (score > bestScore){ best = rec; bestScore = score; }
+    }
+    return { record: best, score: bestScore };
+  } catch(e){ return { record: null, score: 0, error: true }; }
+}
+
+/* ---------- 3c. Website lookups: live fetch via public relay + Internet Archive ---------- */
+async function fetchPageViaRelay(url){
+  const prox = await fetchJSON('https://api.allorigins.win/get?url=' + encodeURIComponent(url));
+  const status = prox.status && prox.status.http_code;
+  const html = prox.contents || '';
+  const tm = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const pageTitle = tm ? tm[1].replace(/\s+/g,' ').trim() : null;
+  const pageText = html
+    .replace(/<script[\s\S]*?<\/script>/gi,' ')
+    .replace(/<style[\s\S]*?<\/style>/gi,' ')
+    .replace(/<[^>]+>/g,' ')
+    .slice(0, 40000);
+  return { status, pageTitle, pageText };
+}
+
+async function checkWayback(url){
+  try {
+    const data = await fetchJSON('https://archive.org/wayback/available?url=' + encodeURIComponent(url));
+    const snap = data.archived_snapshots && data.archived_snapshots.closest;
+    return (snap && snap.available) ? { url: snap.url, timestamp: snap.timestamp } : null;
+  } catch(e){ return null; }
+}
+
+/* ---------- 4. Compare reference text to the matched record ---------- */
+function journalMatches(body, journals){
+  const hay = ' ' + normalize(body) + ' ';
+  const refToks = normalize(body).split(' ').filter(Boolean);
+  for (const j of journals){
+    const toks = significantTokens(j);
+    if (toks.length){
+      let hit = 0;
+      for (const t of toks){ if (hay.includes(t)) hit++; }
+      if (hit / toks.length >= 0.6) return true;
+    }
+    // Abbreviation check: e.g. "n engl j med" ↔ "new england journal of medicine".
+    // Look for a contiguous run of reference tokens where each is a prefix of the
+    // corresponding significant journal word, in order.
+    const jwords = normalize(j).split(' ').filter(w => w && !STOPWORDS.has(w));
+    if (jwords.length >= 2){
+      for (let i = 0; i + jwords.length <= refToks.length; i++){
+        let all = true, weight = 0;
+        for (let k = 0; k < jwords.length; k++){
+          const rt = refToks[i+k];
+          if (!rt || !jwords[k].startsWith(rt)){ all = false; break; }
+          weight += rt.length;
+        }
+        if (all && weight >= jwords.length + 2) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function compareToRecord(refBody, clues, record, titleScore, kind){
+  kind = kind || 'article';
+  const issues = []; // {level:'critical'|'minor', text}
+  const hay = ' ' + normalize(refBody) + ' ';
+
+  // Title
+  if (titleScore < 0.7){
+    issues.push({level:'critical', text:'Title does not match the closest real record — the cited work may not exist as written. Closest match: “' + record.title + '”.'});
+  } else if (titleScore < 0.92){
+    issues.push({level:'minor', text:'Title wording differs slightly from the published record: “' + record.title + '”.'});
+  }
+
+  // Authors
+  if (record.authors.length){
+    const firstFam = normalize(record.authors[0]);
+    if (firstFam && !hay.includes(firstFam)){
+      issues.push({level:'critical', text:'First author mismatch — published record lists “' + record.authors[0] + '” as first author, which does not appear in the reference.'});
+    }
+    if (!clues.hasEtAl && record.authors.length <= 8){
+      const missing = record.authors.filter(a => a.length > 2 && !hay.includes(normalize(a)));
+      if (missing.length && missing.length >= record.authors.length / 2){
+        issues.push({level:'critical', text:'Author list mismatch — these published authors are absent from the reference: ' + missing.join(', ') + '.'});
+      } else if (missing.length){
+        issues.push({level:'minor', text:'Some published authors are missing or misspelled: ' + missing.join(', ') + '.'});
+      }
+    }
+  }
+
+  // Year
+  if (record.year && clues.year){
+    const diff = Math.abs(record.year - clues.year);
+    if (kind === 'book'){
+      if (diff > 0){
+        issues.push({level:'minor', text:'Year differs from the matched record (' + clues.year + ' cited vs ' + record.year + ') — books often have multiple editions, so verify the cited edition exists.'});
+      }
+    } else if (diff === 1){
+      issues.push({level:'minor', text:'Year is off by one (' + clues.year + ' cited vs ' + record.year + ' published) — often an online-first vs print discrepancy.'});
+    } else if (diff > 1){
+      issues.push({level:'critical', text:'Year mismatch: reference says ' + clues.year + ' but the record is from ' + record.year + '.'});
+    }
+  }
+
+  // Journal (articles) / Publisher (books)
+  if (record.journals.length && !journalMatches(refBody, record.journals)){
+    if (kind === 'book'){
+      issues.push({level:'minor', text:'Publisher differs from the record (“' + record.journals[0] + '”). Could be a different edition or imprint.'});
+    } else {
+      issues.push({level:'minor', text:'Journal name differs from the record (“' + record.journals[0] + '”). Could be an abbreviation, or the wrong journal.'});
+    }
+  }
+
+  // Volume
+  if (record.volume && /\d/.test(record.volume) && !hay.includes(' ' + normalize(record.volume) + ' ') && !refBody.includes(record.volume)){
+    issues.push({level:'minor', text:'Volume in the record is ' + record.volume + ', which does not appear in the reference.'});
+  }
+
+  // Pages (compare first page)
+  if (record.pages){
+    const firstPage = (String(record.pages).match(/[A-Za-z]?\d+/) || [])[0];
+    if (firstPage && !refBody.toLowerCase().includes(firstPage.toLowerCase())){
+      issues.push({level:'minor', text:'Page numbers differ — the record starts at page ' + record.pages + '.'});
+    }
+  }
+
+  // DOI
+  if (clues.doi && record.doi && clues.doi.toLowerCase() !== record.doi){
+    issues.push({level:'critical', text:'DOI mismatch — reference gives ' + clues.doi + ' but the matched record is ' + record.doi + '.'});
+  }
+
+  // ISBN
+  if (clues.isbn && record.isbns && record.isbns.length && !record.isbns.includes(clues.isbn)){
+    issues.push({level:'critical', text:'ISBN mismatch — reference gives ' + clues.isbn + ' but the matched book has ' + record.isbns.join(' / ') + '.'});
+  }
+
+  return issues;
+}
+
+/* ---------- 5. Verify one reference ---------- */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* Website citations: check the cited page itself, not the literature databases */
+async function verifyWebsite(ref, clues, url){
+  const issues = [];
+  let page = null, relayFailed = false;
+  try { page = await fetchPageViaRelay(url); } catch(e){ relayFailed = true; }
+
+  const record = { source:'Live website', title:(page && page.pageTitle) || url, authors:[], year:null,
+                   journals:[], volume:null, pages:null, doi:null, url };
+
+  if (page && page.status && page.status < 400){
+    // Page is live — check that what the author cited actually appears on it
+    const descriptor = ref.body
+      .replace(/https?:\/\/[^\s]+/ig,' ').replace(/\bwww\.[^\s]+/ig,' ')
+      .replace(/\b(accessed|available (at|from)|retrieved|cited)\b[^.;]*/ig,' ');
+    const score = containment(descriptor, (page.pageTitle || '') + ' ' + page.pageText);
+    const thinPage = (page.pageText || '').replace(/\s+/g,' ').trim().length < 400;
+    if (thinPage && score < 0.65){
+      // Many sites build their content with scripts, leaving almost no text to scan
+      issues.push({level:'minor', text:'The page is live, but it loads its content with scripts so it could not be checked automatically. Open the link to verify the cited content.'});
+    } else if (score < 0.3){
+      issues.push({level:'critical', text:'The page is live, but the cited title/description was not found on it. The page content may have changed since it was cited — or the citation may be wrong.' + (page.pageTitle ? ' The page currently reads: “' + page.pageTitle + '”.' : '')});
+    } else if (score < 0.65){
+      issues.push({level:'minor', text:'The page is live but only partly matches the citation' + (page.pageTitle ? ' (current page title: “' + page.pageTitle + '”)' : '') + '. Verify the details by opening the link.'});
+    }
+    // Access year sanity check
+    if (clues.year && clues.year > new Date().getFullYear()){
+      issues.push({level:'critical', text:'The cited access/publication year (' + clues.year + ') is in the future.'});
+    }
+  } else {
+    // Dead or unreachable — consult the Internet Archive
+    const snap = await checkWayback(url);
+    if (page && page.status >= 400){
+      if (snap){
+        issues.push({level:'critical', text:'The cited URL returns an error (HTTP ' + page.status + '). An archived copy exists at ' + snap.url + ' — the page once existed but the link is now dead.'});
+        record.url = snap.url;
+      } else {
+        issues.push({level:'critical', text:'The cited URL returns an error (HTTP ' + page.status + ') and no archived copy was found. The link may be fabricated or mistyped.'});
+      }
+    } else if (relayFailed || !page || !page.status){
+      if (snap){
+        issues.push({level:'minor', text:'The page could not be loaded directly (some sites block automated access), but the Internet Archive holds a copy at ' + snap.url + ' — so the URL is real. Verify the content manually.'});
+        record.url = snap.url;
+      } else {
+        return { ...ref, status:'error', record,
+          issues:[{level:'minor', text:'Could not reach the website or find it in the Internet Archive. It may block automated access — open the link manually to verify.'}] };
+      }
+    }
+  }
+
+  const status = issues.some(i => i.level==='critical') ? 'critical' : issues.length ? 'minor' : 'ok';
+  return { ...ref, status, issues, record };
+}
+
+/* Book citations: Google Books first (ISBN when available), Open Library as fallback */
+async function verifyBook(ref, clues){
+  const gb = await lookupGoogleBooks(ref.body, clues);
+  let record = gb.record, titleScore = gb.score;
+  let apiError = !!gb.error;
+
+  if (!record || titleScore < 0.7){
+    const ol = await lookupOpenLibrary(ref.body);
+    apiError = apiError || !!ol.error;
+    if (ol.score > titleScore){ record = ol.record; titleScore = ol.score; }
+  }
+  if (!record || titleScore < 0.7){
+    // Crossref indexes many academic books and chapters too
+    const cr = await lookupCrossrefBiblio(ref.body);
+    apiError = apiError || !!cr.error;
+    if (cr.score > titleScore){ record = cr.record; titleScore = cr.score; }
+  }
+
+  if (!record || titleScore < 0.35){
+    if (apiError && !record){
+      return { ...ref, status:'error', record:null,
+        issues:[{level:'minor', text:'Could not verify — the book databases did not respond. Try again later.'}] };
+    }
+    return { ...ref, status:'critical', record:null,
+      issues:[{level:'critical', text:'No matching book found in Google Books, Open Library, or Crossref. This reference may be fabricated (hallucinated).'}] };
+  }
+
+  const issues = compareToRecord(ref.body, clues, record, titleScore, 'book');
+  if (clues.isbn && gb.isbnMissing){
+    issues.unshift({level:'critical', text:'The ISBN in this reference (' + clues.isbn + ') was not found in Google Books.'});
+  }
+  const status = issues.some(i => i.level==='critical') ? 'critical'
+               : issues.length ? 'minor' : 'ok';
+  return { ...ref, status, issues, record };
+}
+
+async function verifyReference(ref){
+  const clues = extractClues(ref.body);
+
+  // Route 1: website citation → check the site itself.
+  // (A reference with journal-style volume/page numbers is an article whose URL is
+  // just a courtesy link, so those stay on the literature-database route.)
+  const url = extractUrl(ref.body);
+  const journalPattern = /\d+\s*\(\d+\)\s*:\s*[A-Za-z]?\d+/.test(ref.body) || /;\s*\d+\s*:\s*[A-Za-z]?\d+/.test(ref.body);
+  if (url && !clues.doi && !journalPattern) return verifyWebsite(ref, clues, url);
+
+  // Route 2: book or book chapter → book databases
+  if (looksLikeBook(ref.body, clues)) return verifyBook(ref, clues);
+
+  // Route 3: journal article → Crossref + PubMed
+  let record = null, titleScore = 0, apiError = false;
+
+  // Strongest evidence first: an explicit DOI
+  if (clues.doi){
+    record = await lookupCrossrefByDOI(clues.doi);
+    if (record === null){
+      // DOI resolves nowhere — very strong hallucination signal, but still try to find the real work
+      const cr = await lookupCrossrefBiblio(ref.body);
+      if (cr.record && cr.score >= 0.5){
+        const issues = compareToRecord(ref.body, clues, cr.record, cr.score);
+        issues.unshift({level:'critical', text:'The DOI in this reference (' + clues.doi + ') does not exist in Crossref.'});
+        return { ...ref, status:'critical', issues, record: cr.record };
+      }
+      return { ...ref, status:'critical', record:null,
+        issues:[{level:'critical', text:'The DOI in this reference (' + clues.doi + ') does not exist, and no matching publication was found. Likely fabricated.'}] };
+    }
+    titleScore = containment(record.title, ref.body);
+  }
+
+  // Bibliographic search on Crossref
+  if (!record || titleScore < 0.5){
+    const cr = await lookupCrossrefBiblio(ref.body);
+    apiError = apiError || !!cr.error;
+    if (cr.score > titleScore){ record = cr.record; titleScore = cr.score; }
+  }
+
+  // PubMed fallback / cross-check
+  if (!record || titleScore < 0.7){
+    await sleep(350); // respect NCBI's 3 requests/second limit
+    const pm = await lookupPubMed(ref.body, clues);
+    apiError = apiError || !!pm.error;
+    if (pm.score > titleScore){ record = pm.record; titleScore = pm.score; }
+  }
+
+  if (!record || titleScore < 0.35){
+    // Last resort: it might be a book that didn't look like one
+    const gb = await lookupGoogleBooks(ref.body, clues);
+    if (gb.record && gb.score >= 0.6){
+      const issues = compareToRecord(ref.body, clues, gb.record, gb.score, 'book');
+      const status = issues.some(i => i.level==='critical') ? 'critical' : issues.length ? 'minor' : 'ok';
+      return { ...ref, status, issues, record: gb.record };
+    }
+    if (apiError && !record){
+      return { ...ref, status:'error', record:null,
+        issues:[{level:'minor', text:'Could not verify — the reference databases did not respond. Try again later.'}] };
+    }
+    return { ...ref, status:'critical', record:null,
+      issues:[{level:'critical', text:'No matching publication found in Crossref, PubMed, or Google Books. This reference may be fabricated (hallucinated).'}] };
+  }
+
+  const issues = compareToRecord(ref.body, clues, record, titleScore);
+  const status = issues.some(i => i.level==='critical') ? 'critical'
+               : issues.length ? 'minor' : 'ok';
+  return { ...ref, status, issues, record };
+}
+
+/* ---------- 6. UI orchestration ---------- */
+function esc(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+const STATUS_LABEL = { ok:'Verified', minor:'Minor issues', critical:'Critical', error:'Unverifiable' };
+
+function renderResult(r, idx){
+  const issuesHtml = (r.issues||[]).map(i =>
+    '<li class="'+i.level+'"><strong>'+(i.level==='critical'?'Critical: ':'Minor: ')+'</strong>'+esc(i.text)+'</li>').join('');
+  const matched = r.record ?
+    '<div class="matched">Matched record ('+esc(r.record.source)+'): '+esc(r.record.title)+' — '+esc(r.record.journals[0]||'')+' '+(r.record.year||'')+
+    (r.record.url ? ' · <a href="'+esc(r.record.url)+'" target="_blank" rel="noopener">open record</a>' : '')+'</div>' : '';
+  return '<div class="ref '+r.status+'">'+
+    '<div class="ref-head"><span class="ref-num">Reference '+(idx+1)+'</span>'+
+    '<span class="badge '+r.status+'">'+STATUS_LABEL[r.status]+'</span></div>'+
+    '<div class="ref-text">'+esc(r.original)+'</div>'+
+    (issuesHtml ? '<ul class="issues">'+issuesHtml+'</ul>' : '')+
+    matched + '</div>';
+}
+
+async function runCheck(){
+  if (state.running) return;
+  const text = $('refInput').value.trim();
+  if (!text){ alert('Paste a reference list first.'); return; }
+  const refs = splitReferences(text);
+  if (!refs.length){ alert('No references could be detected in the pasted text.'); return; }
+
+  state.running = true;
+  state.results = [];
+  $('checkBtn').disabled = true;
+  $('results').innerHTML = '';
+  $('summary').style.display = 'none';
+  $('progressWrap').style.display = 'block';
+
+  for (let i = 0; i < refs.length; i++){
+    $('progressLabel').textContent = 'Checking reference ' + (i+1) + ' of ' + refs.length + '…';
+    $('progressFill').style.width = ((i)/refs.length*100) + '%';
+    let result;
+    try { result = await verifyReference(refs[i]); }
+    catch(e){ result = { ...refs[i], status:'error', record:null, issues:[{level:'minor', text:'Could not verify due to a technical error.'}] }; }
+    state.results.push(result);
+    $('results').insertAdjacentHTML('beforeend', renderResult(result, i));
+    await sleep(250); // stay polite to the free APIs
+  }
+
+  $('progressFill').style.width = '100%';
+  $('progressLabel').textContent = 'Done — ' + refs.length + ' references checked.';
+  const c = s => state.results.filter(r => r.status===s).length;
+  $('countOk').textContent = c('ok');
+  $('countMinor').textContent = c('minor');
+  $('countCritical').textContent = c('critical');
+  $('countError').textContent = c('error');
+  $('summary').style.display = 'block';
+  $('checkBtn').disabled = false;
+  state.running = false;
+}
+
+/* ---------- 7. Word (.docx) report ---------- */
+async function downloadReport(){
+  if (!window.docx){ alert('The Word-document library failed to load. Check your internet connection and reload the page.'); return; }
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = window.docx;
+  const COLORS = { critical:'B3261E', minor:'9A6700', ok:'1E7A46', error:'55657A' };
+  const children = [];
+
+  children.push(new Paragraph({ heading: HeadingLevel.TITLE, children:[ new TextRun('Reference Integrity Report') ] }));
+  children.push(new Paragraph({ children:[ new TextRun({ text:'Generated ' + new Date().toLocaleString() + ' — articles checked against Crossref and PubMed, books against Google Books and Open Library, websites against the live page and the Internet Archive.', italics:true, size:20 }) ] }));
+  const c = s => state.results.filter(r => r.status===s).length;
+  children.push(new Paragraph({ spacing:{before:200, after:300}, children:[
+    new TextRun({ text: state.results.length + ' references checked:  ' }),
+    new TextRun({ text: c('ok') + ' verified', color: COLORS.ok, bold:true }),
+    new TextRun({ text: '   ' + c('minor') + ' minor issues', color: COLORS.minor, bold:true }),
+    new TextRun({ text: '   ' + c('critical') + ' critical', color: COLORS.critical, bold:true }),
+    new TextRun({ text: '   ' + c('error') + ' unverifiable', color: COLORS.error, bold:true })
+  ]}));
+
+  state.results.forEach((r, idx) => {
+    children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing:{before:280},
+      children:[ new TextRun({ text: 'Reference ' + (idx+1) + ' — ' + STATUS_LABEL[r.status].toUpperCase(), color: COLORS[r.status] }) ] }));
+    children.push(new Paragraph({ children:[ new TextRun({ text: r.original, font:'Consolas', size:20 }) ] }));
+    (r.issues||[]).forEach(i => {
+      children.push(new Paragraph({ bullet:{level:0}, children:[
+        new TextRun({ text: (i.level==='critical'?'CRITICAL: ':'Minor: '), bold:true, color: COLORS[i.level] }),
+        new TextRun({ text: i.text, color: COLORS[i.level] })
+      ]}));
+    });
+    if (r.record){
+      children.push(new Paragraph({ children:[ new TextRun({ text: 'Matched record (' + r.record.source + '): ' + r.record.title +
+        ' — ' + (r.record.journals[0]||'') + ' ' + (r.record.year||'') + (r.record.doi ? ' · doi:' + r.record.doi : ''), size:19, color:'666666' }) ] }));
+    }
+  });
+
+  const doc = new Document({ sections:[{ children }] });
+  const blob = await Packer.toBlob(doc);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'reference-integrity-report.docx';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+$('checkBtn').addEventListener('click', runCheck);
+$('downloadBtn').addEventListener('click', downloadReport);
+$('resetBtn').addEventListener('click', () => {
+  state.results = [];
+  $('results').innerHTML = '';
+  $('summary').style.display = 'none';
+  $('progressWrap').style.display = 'none';
+  $('refInput').value = '';
+  window.scrollTo({top:0});
+});
+</script>
+</body>
+</html>
