@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Reference Integrity Checker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Tenor+Sans&family=Poppins:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"
         onerror="var s=document.createElement('script');s.src='https://unpkg.com/docx@8.5.0/build/index.umd.js';document.head.appendChild(s);"></script>
 <style>
   :root{
-    --paper:#F6F7F5;
+    --paper:#FBFBFB;
     --card:#FFFFFF;
     --ink:#17212C;
     --ink-soft:#4C5B6B;
@@ -25,8 +25,8 @@
     --neutral-bg:#EDF0F3;
     --action:#17212C;
     --mono:'IBM Plex Mono', ui-monospace, monospace;
-    --body:'Source Sans 3', -apple-system, system-ui, sans-serif;
-    --display:'Fraunces', Georgia, serif;
+    --body:'Poppins', -apple-system, system-ui, sans-serif;
+    --display:'Tenor Sans', Georgia, serif;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{background:var(--paper); color:var(--ink); font-family:var(--body); font-size:17px; line-height:1.55;}
@@ -107,9 +107,8 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="kicker">Checked against <b>PubMed</b> · <b>Crossref</b> · <b>Google Books</b> · <b>the live web</b></div>
     <h1>Reference Integrity Checker</h1>
-    <p class="sub">Paste a reference list from a scientific paper. Journal articles are checked against PubMed and Crossref, books against Google Books and Open Library, and web citations against the live page itself. Anything that doesn't match — from a fabricated citation to a wrong page number — is flagged and documented in a downloadable Word report.</p>
+    <p class="sub">Paste a reference list from a scientific paper. Journal articles are checked against PubMed and Crossref, books against Google Books and Open Library, and web citations against the live page itself.</p>
   </header>
 
   <div class="panel">
