@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Reference Integrity Checker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Tenor+Sans&family=Poppins:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"
         onerror="var s=document.createElement('script');s.src='https://unpkg.com/docx@8.5.0/build/index.umd.js';document.head.appendChild(s);"></script>
 <style>
   :root{
-    --paper:#FBFBFB;
+    --paper:#F6F7F5;
     --card:#FFFFFF;
     --ink:#17212C;
     --ink-soft:#4C5B6B;
@@ -25,8 +25,8 @@
     --neutral-bg:#EDF0F3;
     --action:#17212C;
     --mono:'IBM Plex Mono', ui-monospace, monospace;
-    --body:'Poppins', -apple-system, system-ui, sans-serif;
-    --display:'Tenor Sans', Georgia, serif;
+    --body:'Source Sans 3', -apple-system, system-ui, sans-serif;
+    --display:'Fraunces', Georgia, serif;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{background:var(--paper); color:var(--ink); font-family:var(--body); font-size:17px; line-height:1.55;}
@@ -60,13 +60,22 @@
 
   #summary{display:none; margin-top:30px;}
   .stamps{display:flex; gap:12px; flex-wrap:wrap;}
-  .stamp{border:2px solid; border-radius:6px; padding:10px 16px; font-family:var(--mono); font-size:13px; letter-spacing:0.06em; text-transform:uppercase; transform:rotate(-1deg); background:#fff;}
-  .stamp b{display:block; font-size:24px; letter-spacing:0; font-family:var(--body); line-height:1.1;}
+  .stamp{flex:1 1 0; min-width:130px; text-align:center; border:2px solid; border-radius:8px; padding:12px 16px; font-family:var(--mono); font-size:13px; letter-spacing:0.06em; text-transform:uppercase; background:#fff; cursor:pointer; transition:transform .12s, box-shadow .12s, background .12s; user-select:none;}
+  .stamp:hover{transform:translateY(-2px); box-shadow:0 4px 12px rgba(23,33,44,0.1);}
+  .stamp:focus-visible{outline:2px solid var(--ink); outline-offset:2px;}
+  .stamp b{display:block; font-size:26px; letter-spacing:0; font-family:var(--body); line-height:1.1; margin-bottom:2px;}
   .stamp.ok{color:var(--verify); border-color:var(--verify);}
-  .stamp.minor{color:var(--minor); border-color:var(--minor); transform:rotate(1deg);}
-  .stamp.critical{color:var(--critical); border-color:var(--critical); transform:rotate(-1.5deg);}
-  .stamp.notfound{color:var(--neutral); border-color:var(--neutral); transform:rotate(0.8deg);}
+  .stamp.minor{color:var(--minor); border-color:var(--minor);}
+  .stamp.critical{color:var(--critical); border-color:var(--critical);}
+  .stamp.notfound{color:var(--neutral); border-color:var(--neutral);}
+  .stamp.active.ok{background:var(--verify-bg);}
+  .stamp.active.minor{background:var(--minor-bg);}
+  .stamp.active.critical{background:var(--critical-bg);}
+  .stamp.active.notfound{background:var(--neutral-bg);}
+  .stamp.active{box-shadow:0 0 0 3px rgba(23,33,44,0.12); transform:translateY(-2px);}
+  .filter-hint{font-family:var(--mono); font-size:12.5px; color:var(--ink-soft); margin-top:12px; min-height:18px;}
 
+  #parseWarning{display:none; margin-top:22px; background:var(--minor-bg); border:1px solid var(--minor); border-left:5px solid var(--minor); border-radius:8px; padding:14px 16px; color:#6b4a00; font-size:15px; line-height:1.5;}
   #results{margin-top:22px;}
   .ref{background:var(--card); border:1px solid var(--line); border-left:5px solid var(--line); border-radius:8px; padding:16px 18px; margin-bottom:14px;}
   .ref.ok{border-left-color:var(--verify);}
@@ -98,8 +107,9 @@
 <body>
 <div class="wrap">
   <header>
+    <div class="kicker">Checked against <b>PubMed</b> · <b>Crossref</b> · <b>Google Books</b> · <b>the live web</b></div>
     <h1>Reference Integrity Checker</h1>
-    <p class="sub">Paste a reference list from a scientific paper. Journal articles are checked against PubMed and Crossref, books against Google Books and Open Library, and web citations against the live page itself.</p>
+    <p class="sub">Paste a reference list from a scientific paper. Journal articles are checked against PubMed and Crossref, books against Google Books and Open Library, and web citations against the live page itself. Anything that doesn't match — from a fabricated citation to a wrong page number — is flagged and documented in a downloadable Word report.</p>
   </header>
 
   <div class="panel">
@@ -118,17 +128,19 @@
 
   <div id="summary">
     <div class="stamps">
-      <div class="stamp ok"><b id="countOk">0</b>verified</div>
-      <div class="stamp minor"><b id="countMinor">0</b>minor issues</div>
-      <div class="stamp critical"><b id="countCritical">0</b>critical</div>
-      <div class="stamp notfound"><b id="countError">0</b>unverifiable</div>
+      <div class="stamp ok" data-status="ok" role="button" tabindex="0"><b id="countOk">0</b>verified</div>
+      <div class="stamp minor" data-status="minor" role="button" tabindex="0"><b id="countMinor">0</b>minor issues</div>
+      <div class="stamp critical" data-status="critical" role="button" tabindex="0"><b id="countCritical">0</b>critical</div>
+      <div class="stamp notfound" data-status="error" role="button" tabindex="0"><b id="countError">0</b>unverifiable</div>
     </div>
+    <div class="filter-hint" id="filterHint">Tip: click a category above to show only those references.</div>
     <div class="row" style="margin-top:18px;">
       <button class="btn-main" id="downloadBtn">Download Word report (.docx)</button>
       <button class="btn-ghost" id="resetBtn">Start over</button>
     </div>
   </div>
 
+  <div id="parseWarning" role="alert"></div>
   <div id="results" aria-live="polite"></div>
 
   <footer>
@@ -173,32 +185,195 @@ function containment(title, text){
 }
 
 /* ---------- 1. Split the pasted block into references ---------- */
-function splitReferences(text){
-  const rawLines = text.split(/\r?\n/);
-  const numRe = /^\s*(?:\[(\d{1,3})\]|(\d{1,3})[.)])\s+/;
-  const numberedIdx = rawLines.filter(l => numRe.test(l)).length;
+/* ===================================================================
+   REFERENCE PARSER
+   Cleans mangled copy-pasted PDF text and splits it into individual
+   references. Handles two numbering layouts:
+     • Detached blocks  (Lancet style: "25 26 27 …" then the bodies)
+     • Inline numbering (BMJ "1 Smith" / NEJM "1. Smith")
+   Plus ligature repair, running header/footer removal, and wrapped
+   lines. Validated on Lancet, BMJ, and NEJM reference lists.
+   =================================================================== */
 
-  let refs = [];
-  if (numberedIdx >= 2){
-    let cur = null;
-    for (const line of rawLines){
-      if (numRe.test(line)){
-        if (cur) refs.push(cur);
-        cur = line.trim();
-      } else if (cur && line.trim()){
-        cur += ' ' + line.trim();
-      }
-    }
-    if (cur) refs.push(cur);
-  } else if (/\n\s*\n/.test(text)){
-    refs = text.split(/\n\s*\n+/).map(b => b.replace(/\s+/g,' ').trim()).filter(Boolean);
-  } else {
-    refs = rawLines.map(l => l.trim()).filter(l => l.length > 20);
+function repairLigatures(text){
+  const fixes = [
+    [/(\w)fi (\w)/g, '$1fi$2'], [/(\w)fl (\w)/g, '$1fl$2'], [/(\w)ff (\w)/g, '$1ff$2'],
+    [/\bfi (\w)/g, 'fi$1'], [/\bfl (\w)/g, 'fl$1'], [/\bEff (\w)/g, 'Eff$1'], [/\bAff (\b|\w)/g, 'Aff$1'],
+  ];
+  text = text.replace(/\uFB00/g,'ff').replace(/\uFB01/g,'fi').replace(/\uFB02/g,'fl')
+             .replace(/\uFB03/g,'ffi').replace(/\uFB04/g,'ffl');
+  for (const [re, rep] of fixes) text = text.replace(re, rep);
+  const words = [
+    ['defi nitions','definitions'],['defi nition','definition'],['defi ne','define'],['defi ning','defining'],
+    ['specifi c','specific'],['country-specifi c','country-specific'],['Redefi ning','Redefining'],
+    ['cost-eff ectiveness','cost-effectiveness'],['Cost-eff ectiveness','Cost-effectiveness'],
+    ['eff ectiveness','effectiveness'],['Eff ect','Effect'],['eff ect','effect'],
+    ['fi ve','five'],['under-fi ve','under-five'],['fi les','files'],['fi nal','final'],
+  ];
+  for (const [a,b] of words) text = text.split(a).join(b);
+  return text;
+}
+
+function stripJournalNoise(text){
+  const noise = [
+    /BMJ Global Health: first published[^\n]*\n?/g,
+    /Downloaded from https?:\/\/[^\n]*\n?/g,
+    /Protected by copyright[^\n]*\n?/g,
+    /^\s*BMJ Global Health\s*$/gm,
+    /^\s*The Lancet Commissions\s*$/gm,
+    /www\.thelancet\.com\s+Published online[^\n]*\n?/g,
+    /n engl j med\s+nejm\.org[^\n]*?(?=\d+\.\s+[A-Z]|$)/g,
+    /Copyright ©[^\n]*?(?:Society|Society\.)\s*/g,
+    /^\s*\d+\s+[A-Z][a-z]+ [A-Z], et al\. BMJ Glob Health \d{4};[^\n]*\n?/gm,
+  ];
+  for (const p of noise) text = text.replace(p, '\n');
+  return text;
+}
+
+function stripNumberBlocks(text){
+  const headerFooterPatterns = [
+    /The Lancet Commissions/g,
+    /www\.thelancet\.com\s+Published online[^\n]*?60160-X(?:\s+\d+)?/g,
+    /Published online April 27, 2015[^\n]*?60160-X(?:\s+\d+)?/g,
+  ];
+  for (const p of headerFooterPatterns) text = text.replace(p, ' ');
+  const stream = text.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim();
+  const tokens = stream.split(' ');
+  const out = []; let firstNumberSeen = null; let i = 0;
+  while (i < tokens.length){
+    let j = i;
+    while (j < tokens.length && /^\d{1,3}$/.test(tokens[j])) j++;
+    if (j - i >= 4){
+      const nums = tokens.slice(i, j).map(Number);
+      if (firstNumberSeen === null) firstNumberSeen = Math.min(...nums);
+      i = j;
+    } else { out.push(tokens[i]); i++; }
   }
-  return refs.map(r => ({
-    original: r,
-    body: r.replace(numRe,'').trim()
-  })).filter(r => r.body.length > 10);
+  return { stream: out.join(' '), startIndex: firstNumberSeen };
+}
+
+function splitEntries(stream){
+  const terminator =
+    '(?:' +
+      '\\(in press\\)\\.' +
+      '|\\(accessed[^)]*\\)\\.' +
+      '|\\d{4}[:;][^.]*?\\d[–-][A-Za-z]?\\d+\\.{1,2}' +
+      '|:\\s?[eS]?\\d+[–-]?\\d*\\.{1,2}' +
+      '|,\\s?\\d{4}\\.?' +
+      '|\\d{4}\\.' +
+      '|\\)\\.' +
+      '|DOI:\\s?10\\.\\S+' +
+    ')';
+  const opener =
+    '(?:' +
+      '(?:van der |van |von |de la |de |del )?[A-ZÀ-Þ][A-Za-zÀ-þ\'’.-]+(?:-[A-Za-zÀ-þ\'’]+)? [A-Z]{1,4}(?: [A-Z]{1,4})?[,.]' +
+      '|[A-ZÀ-Þ][A-Za-zÀ-þ\'’-]+, [A-Z][,.]' +
+      '|WHO[.,]' +
+      '|[A-Z][A-Za-zÀ-þ]+ Consensus \\d{4}[—–-]' +
+      '|(?:The |UN )?[A-Z][A-Za-zÀ-þ]+(?: (?:of |and |the |for )?[A-Z][A-Za-zÀ-þ&’-]+){1,5}[.,](?!(?:,?\\s*\\d{4}\\.?)?\\s*(?:https?:|www\\.))' +
+    ')';
+  const boundaryRe = new RegExp('(' + terminator + ')\\s+(?=' + opener + ')', 'g');
+  const SENTINEL = '\u0000SPLIT\u0000';
+  const marked = stream.replace(boundaryRe, '$1' + SENTINEL);
+  return marked.split(SENTINEL).map(s => s.trim()).filter(s => s.length > 15);
+}
+
+function looksLikeAttachedNumbers(text){
+  const flat = text.replace(/\s+/g, ' ');
+  if (/(?:\b\d{1,3}\s+){4,}\d{1,3}\s+[A-Z]/.test(flat)) return false;
+  const hits = [...flat.matchAll(/(?:^|\s)(\d{1,3})\.?\s+[A-Z“"(]/g)].map(m => parseInt(m[1],10));
+  if (hits.length < 5) return false;
+  let best = 1, run = 1;
+  for (let i = 1; i < hits.length; i++){
+    if (hits[i] === hits[i-1] + 1){ run++; best = Math.max(best, run); } else run = 1;
+  }
+  return best >= 5;
+}
+
+function splitAttachedNumbers(text){
+  text = stripJournalNoise(text);
+  let stream = text.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim().replace(/^References\s+/i, '');
+  const tokens = stream.split(' ');
+  const entries = []; let expected = 1; let current = null;
+  for (let i = 0; i < tokens.length; i++){
+    const tok = tokens[i]; const next = tokens[i+1] || '';
+    const bare = tok.replace(/\.$/, '');
+    if (bare === String(expected) && /^[A-Z“"(]/.test(next)){
+      if (current) entries.push(current.join(' '));
+      current = []; expected++; continue;
+    }
+    if (current) current.push(tok);
+  }
+  if (current) entries.push(current.join(' '));
+  return { entries, startIndex: 1 };
+}
+
+/* Main entry point: raw pasted text -> [{original, body}] */
+function splitReferences(text){
+  const repaired = repairLigatures(text);
+  let entries, base;
+  if (looksLikeAttachedNumbers(repaired)){
+    entries = splitAttachedNumbers(repaired).entries;
+    base = 1;
+  } else {
+    const { stream, startIndex } = stripNumberBlocks(repaired);
+    entries = splitEntries(stream);
+    base = (startIndex && startIndex > 0) ? startIndex : 1;
+  }
+  // Fallback: if the smart parser found nothing usable, fall back to a
+  // simple line/blank-line split so the user still gets a result.
+  if (entries.length < 2){
+    const rawLines = repaired.split(/\r?\n/);
+    if (/\n\s*\n/.test(repaired)){
+      entries = repaired.split(/\n\s*\n+/).map(b => b.replace(/\s+/g,' ').trim()).filter(b => b.length > 15);
+    } else {
+      entries = rawLines.map(l => l.trim()).filter(l => l.length > 20);
+    }
+  }
+  return entries.map(e => ({ original: e.trim(), body: e.trim() })).filter(r => r.body.length > 10);
+}
+
+/* ---------- Integrity check: expected vs. parsed count ---------- */
+function checkSplitIntegrity(rawText, count){
+  const flat = rawText.replace(/\s+/g, ' ');
+  const candidates = new Set();
+  for (const m of flat.matchAll(/(?:^|\s)(\d{1,4})\.?\s+["“(A-Z]/g)){
+    const n = parseInt(m[1],10); if (n >= 1 && n <= 5000) candidates.add(n);
+  }
+  for (const m of flat.matchAll(/((?:\b\d{1,4}\b\s+){3,}\b\d{1,4}\b)/g)){
+    for (const t of m[1].trim().split(/\s+/)){
+      const n = parseInt(t,10); if (n >= 1 && n <= 5000) candidates.add(n);
+    }
+  }
+  let expected = null;
+  if (candidates.size >= 3){
+    const sorted = [...candidates].sort((a,b) => a-b);
+    let bestLo = sorted[0], bestHi = sorted[0];
+    let curLo = sorted[0], curHi = sorted[0];
+    for (let i = 1; i < sorted.length; i++){
+      if (sorted[i] - curHi <= 2){ curHi = sorted[i]; }
+      else { curLo = sorted[i]; curHi = sorted[i]; }
+      if (curHi - curLo > bestHi - bestLo){ bestLo = curLo; bestHi = curHi; }
+    }
+    expected = (bestLo <= 2) ? bestHi : (bestHi - bestLo + 1);
+  }
+  if (expected === null){
+    const term = (flat.match(/\d{4};\s?\d+|\bdoi:\s?10\.|\(in press\)\./gi) || []).length;
+    if (term >= 3) expected = term;
+  }
+  if (expected === null){
+    return { level: count === 0 ? 'error' : 'ok', expected: null, count,
+      message: count === 0 ? "No references could be detected in the pasted text. Please check that you pasted the reference list." : null };
+  }
+  const diff = Math.abs(expected - count);
+  const slack = Math.max(1, Math.round(expected * 0.05));
+  if (diff <= slack) return { level: 'ok', expected, count, message: null };
+  if (count < expected){
+    return { level: 'error', expected, count,
+      message: `Heads up: this list appears to contain about ${expected} references, but I was only able to separate ${count} of them. Some references may have been merged together. Please spot-check the results below — especially any unusually long entries — before relying on them.` };
+  }
+  return { level: 'error', expected, count,
+    message: `Heads up: this list appears to contain about ${expected} references, but I separated it into ${count} pieces — more than expected. Some entries may have been split in the wrong place, or page headers/footers may have been counted as references. Please spot-check the results below before relying on them.` };
 }
 
 /* ---------- 2. Extract clues from a reference string ---------- */
@@ -684,7 +859,7 @@ function renderResult(r, idx){
   const matched = r.record ?
     '<div class="matched">Matched record ('+esc(r.record.source)+'): '+esc(r.record.title)+' — '+esc(r.record.journals[0]||'')+' '+(r.record.year||'')+
     (r.record.url ? ' · <a href="'+esc(r.record.url)+'" target="_blank" rel="noopener">open record</a>' : '')+'</div>' : '';
-  return '<div class="ref '+r.status+'">'+
+  return '<div class="ref '+r.status+'" data-status="'+r.status+'">'+
     '<div class="ref-head"><span class="ref-num">Reference '+(idx+1)+'</span>'+
     '<span class="badge '+r.status+'">'+STATUS_LABEL[r.status]+'</span></div>'+
     '<div class="ref-text">'+esc(r.original)+'</div>'+
@@ -698,6 +873,17 @@ async function runCheck(){
   if (!text){ alert('Paste a reference list first.'); return; }
   const refs = splitReferences(text);
   if (!refs.length){ alert('No references could be detected in the pasted text.'); return; }
+
+  // Integrity check: warn if the parsed count diverges from the expected count.
+  const integrity = checkSplitIntegrity(text, refs.length);
+  const warnEl = $('parseWarning');
+  if (integrity.message){
+    warnEl.textContent = integrity.message;
+    warnEl.style.display = 'block';
+  } else {
+    warnEl.style.display = 'none';
+    warnEl.textContent = '';
+  }
 
   state.running = true;
   state.results = [];
@@ -725,6 +911,7 @@ async function runCheck(){
   $('countCritical').textContent = c('critical');
   $('countError').textContent = c('error');
   $('summary').style.display = 'block';
+  applyFilter();
   $('checkBtn').disabled = false;
   state.running = false;
 }
@@ -772,14 +959,49 @@ async function downloadReport(){
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
-$('checkBtn').addEventListener('click', runCheck);
+/* ---------- 8. Category filtering ---------- */
+let activeFilter = null;
+const FILTER_WORD = { ok:'verified', minor:'minor-issue', critical:'critical', error:'unverifiable' };
+
+function applyFilter(){
+  document.querySelectorAll('#results .ref').forEach(el => {
+    el.style.display = (!activeFilter || el.dataset.status === activeFilter) ? '' : 'none';
+  });
+  document.querySelectorAll('.stamp').forEach(s => {
+    s.classList.toggle('active', s.dataset.status === activeFilter);
+  });
+  const hint = $('filterHint');
+  if (!activeFilter){
+    hint.textContent = 'Tip: click a category above to show only those references.';
+  } else {
+    const n = state.results.filter(r => r.status === activeFilter).length;
+    hint.textContent = 'Showing ' + n + ' ' + FILTER_WORD[activeFilter] + ' reference' + (n===1?'':'s') + ' · click again to show all.';
+  }
+}
+
+function toggleFilter(status){
+  activeFilter = (activeFilter === status) ? null : status;
+  applyFilter();
+}
+
+document.querySelectorAll('.stamp').forEach(stamp => {
+  stamp.addEventListener('click', () => toggleFilter(stamp.dataset.status));
+  stamp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggleFilter(stamp.dataset.status); }
+  });
+});
+
+$('checkBtn').addEventListener('click', () => { activeFilter = null; runCheck(); });
 $('downloadBtn').addEventListener('click', downloadReport);
 $('resetBtn').addEventListener('click', () => {
   state.results = [];
+  activeFilter = null;
+  applyFilter();
   $('results').innerHTML = '';
   $('summary').style.display = 'none';
   $('progressWrap').style.display = 'none';
   $('refInput').value = '';
+  $('parseWarning').style.display = 'none';
   window.scrollTo({top:0});
 });
 </script>
